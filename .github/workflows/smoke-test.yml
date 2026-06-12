@@ -1,0 +1,27 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [main, ci/smoke-tests]
+  pull_request:
+    branches: [main]
+
+jobs:
+  demo-runs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: pip install -e ".[dev]"
+      - name: Smoke test — offline CLI against fixture graph
+        run: |
+          blast-radius src/auth/tokens.py --function checkToken \
+            --graph tests/fixtures/sample_graph.json
+          blast-radius src/auth/tokens.py --function checkToken \
+            --graph tests/fixtures/sample_graph.json --json > /dev/null
+      - name: Unit tests
+        run: python -m pytest tests/ -v
