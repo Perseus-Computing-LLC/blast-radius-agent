@@ -7,7 +7,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #0d1117;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: 'Courier New', 'Consolas', monospace;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -156,7 +156,7 @@ const SCENES = [
     ['agent', ''],
     ['agent', '<span class="highlight">RISK SCORE: HIGH</span><span class="badge risk">HIGH</span>'],
     ['agent', '15 dependents across 3 projects.'],
-    ['agent', ''),
+    ['agent', ''],
     ['agent', 'RECOMMENDED: Notify @backend-team, @billing-team'],
     ['agent', 'and @notifications-team before landing this change.'],
   ]},
@@ -166,9 +166,9 @@ const SCENES = [
     ['label', '── Issue #284 (updated) ──'],
     ['user', '@backend-team @billing-team @notifications-team — blast radius is HIGH.'],
     ['user', 'Can you all review before I land this refactor?'],
-    ['system', '✅ Blast radius caught what CI would have missed.'],
-    ['system', '✅ Right teams notified before the change landed.'],
-    ['system', '✅ Zero broken builds. Zero rollbacks. Zero surprise incidents.'],
+    ['system', '[OK] Blast radius caught what CI would have missed.'],
+    ['system', '[OK] Right teams notified before the change landed.'],
+    ['system', '[OK] Zero broken builds. Zero rollbacks. Zero surprise incidents.'],
     ['agent', ''],
     ['agent', '<span class="low">✓</span> Before Blast Radius: ship → break → CI catches it (hours later)'],
     ['agent', '<span class="low">✓</span> After Blast Radius: query → understand → notify → ship safely'],
@@ -215,11 +215,11 @@ function playNextLine() {
   addLine(type, text);
   lineIndex++;
 
-  let nextDelay = type === 'label' ? 600 :
-                  type === 'system' ? 500 :
-                  type === 'memory' ? 400 :
-                  type === 'agent' ? 700 :
-                  type === 'user' ? 600 : 500;
+  let nextDelay = type === 'label' ? 1800 :
+                  type === 'system' ? 2000 :
+                  type === 'memory' ? 1800 :
+                  type === 'agent' ? 3200 :
+                  type === 'user' ? 2800 : 1800;
 
   setTimeout(playNextLine, nextDelay);
 }
