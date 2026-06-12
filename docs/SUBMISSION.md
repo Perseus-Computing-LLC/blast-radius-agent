@@ -23,6 +23,7 @@ Blast Radius Analyzer is a GitLab Duo custom agent that helps developers underst
 
 Every developer has broken something by missing a downstream dependency. A function signature change crashes an import three projects away. A moved constant kills a service you forgot depended on it. CI catches it hours later — after you've moved on to other work.
 
+A large share of production incidents trace back to cross-file and cross-service dependency breaks rather than to logic errors in the changed code itself. With monorepos and microservice architectures becoming standard, the blast radius of any single change has grown: a one-line signature change can ripple across many downstream consumers. Existing tools (IDE find-references, code search) show immediate callers but collapse under transitive chains and cross-project dependencies.
 Study data shows that cross-file dependency breaks are a leading cause of production incidents in microservice architectures. With monorepos and microservice architectures becoming standard, the blast radius of any single change has grown exponentially. Existing tools (IDE find-references, code search) show immediate callers but collapse under transitive chains and cross-project dependencies.
 
 There is no tool that answers the question every developer asks before landing a change: "What will this break?"

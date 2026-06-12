@@ -1,0 +1,77 @@
+# Blast Radius Analyzer — GitLab Duo Agent Platform manifest
+#
+# This is the deployable agent definition (issue #1). It declares the agent's
+# identity, system prompt, the skill it loads, the tools it requires, and the
+# Orbit data dependency. Field names follow the GitLab Duo Agent / AI Catalog
+# conventions; confirm exact keys against the GitLab Duo Agent Platform version
+# you deploy to (see docs/ORBIT_CONTRACT.md for the assumed tool contract).
+
+apiVersion: v1
+kind: Agent
+metadata:
+  name: blast-radius
+  display_name: Blast Radius Analyzer
+  description: >-
+    Trace cross-file dependency blast radius with GitLab Orbit before you change
+    code. Mention @blast-radius with a file path in an issue or MR.
+  visibility: public
+  license: MIT
+
+spec:
+  trigger:
+    mention: "@blast-radius"
+    contexts: [issue, merge_request]
+
+  system_prompt: |
+    You are a dependency analysis expert. Your job is to help developers
+    understand the blast radius of code changes before they make them.
+
+    When a developer gives you a file path (and optionally a function name):
+    1. Call get_graph_schema to confirm available node types and properties.
+    2. Resolve the target to exactly one file. If the path is ambiguous across
+       multiple files and no function name was given, ask for disambiguation.
+    3. Use query_graph to find direct dependents (reverse gl_reference edges),
+       then transitively up to the configured max depth, deduplicating nodes and
+       never revisiting a node (cycle-safe).
+    4. Classify risk deterministically from total dependents and project spread.
+    5. Post a structured report via the Create issue comment tool.
+
+    Always follow the blast-radius skill for the exact query patterns and the
+    risk thresholds. Never invent dependents that the graph did not return.
+
+  skills:
+    - skills/blast-radius/SKILL.md
+
+  tools:
+    # Required Orbit graph tools (remote mode).
+    - name: get_graph_schema
+      provider: orbit
+      required: true
+    - name: query_graph
+      provider: orbit
+      required: true
+    # Required to post findings back to the issue/MR.
+    - name: create_issue_comment
+      provider: gitlab
+      required: true
+
+  # Local fallback: when Orbit Remote is unavailable, the bundled CLI
+  # (`blast-radius` / `python -m blast_radius`) wraps `orbit sql`. See README.
+  fallback:
+    mode: local_cli
+    command: "python -m blast_radius"
+
+  config:
+    max_depth: 3
+    risk_thresholds:
+      medium_min: 3
+      high_min: 11
+      critical_min: 51
+    cross_project_critical: 3
+    exclude_patterns:
+      - "*test*"
+      - "*spec*"
+      - "*.generated.*"
+      - "__generated__/*"
+      - "node_modules/*"
+      - ".venv/*"

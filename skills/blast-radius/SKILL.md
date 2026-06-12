@@ -84,6 +84,19 @@ WHERE t1.path LIKE '%target_file.py%'
 
 ## Risk Classification
 
+Risk is classified from the **total** dependent count (direct + transitive)
+using inclusive lower bounds, so every count maps to exactly one level (no
+overlapping boundaries). Thresholds are configurable via `.env`.
+
+| Risk Level | Total dependents | Also Critical if |
+|---|---|---|
+| **Low** | 0–2 | — |
+| **Medium** | 3–10 | — |
+| **High** | 11–50 | — |
+| **Critical** | 51+ | dependents span 3+ projects (shared hub) |
+
+The reference implementation of these rules lives in `blast_radius/risk.py`
+and is covered by boundary tests in `tests/test_risk.py`.
 | Risk Level | Criteria |
 |---|---|
 | **Low** | 0-2 direct dependents, no transitive dependents |
@@ -158,7 +171,8 @@ Some files may not appear in the knowledge graph if they were added after the la
 
 ## Pitfalls
 
-- **Cyclic dependencies**: If the graph has cycles, transitive traversal may loop. Limit traversal depth to 3 levels.
+- **Cyclic dependencies**: The graph can contain cycles. The engine prevents loops by seeding the visited set with the target and marking every node visited on discovery (before recursing), in addition to a depth limit. See `blast_radius/engine.py` and the cycle test in `tests/test_engine.py`.
+- **Ambiguous targets**: If a path matches multiple distinct files and no function name is given, ask for disambiguation rather than guessing. If nothing matches, say so explicitly. See `resolve_target` in `blast_radius/engine.py`.
 - **Dynamic imports**: `import()` and `require()` may not appear in static analysis. Flag these as "unanalyzed."
 - **Test files**: Dependencies to/from test files may inflate blast radius. Consider filtering `*test*` and `*spec*` paths.
 - **Generated code**: Auto-generated files create false positives. Filter `*.generated.*` and `__generated__/` paths.

@@ -1,0 +1,27 @@
+{
+  "_comment": "Fixture implementing the Orbit graph contract (issue #5). Definitions are gl_definition nodes; references are gl_reference edges where source_id depends on target_id. Includes a deliberate cycle (10 <-> 11) to exercise cycle-safety (issue #8).",
+  "definitions": [
+    {"id": 1, "name": "checkToken", "path": "src/auth/tokens.py", "language": "python", "project_path": "core-api"},
+    {"id": 2, "name": "middleware", "path": "src/api/middleware.ts", "language": "typescript", "project_path": "core-api"},
+    {"id": 3, "name": "resolvers", "path": "src/graphql/resolvers.ts", "language": "typescript", "project_path": "core-api"},
+    {"id": 4, "name": "stripeWebhook", "path": "src/webhooks/stripe.ts", "language": "typescript", "project_path": "billing-service"},
+    {"id": 5, "name": "routes", "path": "src/api/routes/index.ts", "language": "typescript", "project_path": "core-api"},
+    {"id": 6, "name": "schema", "path": "src/graphql/schema/index.ts", "language": "typescript", "project_path": "core-api"},
+    {"id": 7, "name": "notifier", "path": "src/notify/sender.ts", "language": "typescript", "project_path": "notifications-service"},
+    {"id": 8, "name": "tokens_test", "path": "src/auth/tokens_test.py", "language": "python", "project_path": "core-api"},
+    {"id": 10, "name": "cycleA", "path": "src/cycle/a.py", "language": "python", "project_path": "core-api"},
+    {"id": 11, "name": "cycleB", "path": "src/cycle/b.py", "language": "python", "project_path": "core-api"}
+  ],
+  "references": [
+    {"source_id": 2, "target_id": 1, "relationship_type": "import"},
+    {"source_id": 3, "target_id": 1, "relationship_type": "call"},
+    {"source_id": 4, "target_id": 1, "relationship_type": "call"},
+    {"source_id": 8, "target_id": 1, "relationship_type": "test"},
+    {"source_id": 5, "target_id": 2, "relationship_type": "import"},
+    {"source_id": 6, "target_id": 3, "relationship_type": "import"},
+    {"source_id": 7, "target_id": 4, "relationship_type": "import"},
+    {"source_id": 10, "target_id": 1, "relationship_type": "call"},
+    {"source_id": 11, "target_id": 10, "relationship_type": "call"},
+    {"source_id": 10, "target_id": 11, "relationship_type": "call"}
+  ]
+}

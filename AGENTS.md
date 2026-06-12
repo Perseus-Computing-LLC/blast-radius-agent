@@ -33,8 +33,14 @@ Key graph relationships:
 
 ### Local (Orbit CLI fallback)
 
-When Orbit Remote isn't available, the agent falls back to Orbit CLI:
+When Orbit Remote isn't available, the bundled local engine wraps the Orbit CLI.
+It emits the SQL dialect (not Cypher — see `docs/ORBIT_CONTRACT.md`) and adds
+cycle-safe traversal, exclude filtering, and deterministic risk scoring:
 ```bash
+# High-level (recommended): resolves the target, traverses, scores risk
+blast-radius src/auth/tokens.py --function checkToken
+
+# Low-level (what the engine runs under the hood):
 orbit sql "SELECT t2.path FROM gl_definition t1 JOIN gl_reference ON t1.id = gl_reference.target_id JOIN gl_definition t2 ON gl_reference.source_id = t2.id WHERE t1.path LIKE '%target_file%'"
 ```
 

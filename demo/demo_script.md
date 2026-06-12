@@ -1,5 +1,10 @@
 # Demo Video Script — Blast Radius Analyzer
 
+> **Note (issue #12):** `demo/demo_terminal.html` is a scripted **simulation**
+> with hard-coded output, intended only as a storyboard for recording. The
+> "Live Demo" scene below should be captured from a real agent invocation (or
+> the local engine: `blast-radius <path>`), not from the simulated terminal.
+
 **Target:** 2:45-2:55 (under 3-minute limit)
 **Style:** Screen recording of GitLab UI + voiceover (simulated terminal)
 **Upload:** YouTube (public)
