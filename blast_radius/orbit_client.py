@@ -41,6 +41,21 @@ def _sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _like_literal(value: str) -> str:
+    """Escape a string for use inside a LIKE pattern (with ESCAPE '\\').
+
+    Without this, `%` and `_` in a user-supplied path act as wildcards:
+    `auth_session.py` would match `authXsession.py`, and a stray `%`
+    matches every file — inflating the blast radius and the risk verdict.
+    """
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+        .replace("'", "''")
+    )
+
+
 class OrbitCLIClient:
     """Talks to a real Orbit index via the `orbit sql` command."""
 
@@ -80,7 +95,12 @@ class OrbitCLIClient:
         # Prefer an exact path match; fall back to suffix match for convenience.
         if path:
             p = _sql_literal(path)
-            clauses.append(f"(path = '{p}' OR path LIKE '%/{p}' OR path LIKE '%{p}')")
+            lp = _like_literal(path)
+            clauses.append(
+                f"(path = '{p}' "
+                f"OR path LIKE '%/{lp}' ESCAPE '\\' "
+                f"OR path LIKE '%{lp}' ESCAPE '\\')"
+            )
         if name:
             clauses.append(f"name = '{_sql_literal(name)}'")
         if not clauses:
