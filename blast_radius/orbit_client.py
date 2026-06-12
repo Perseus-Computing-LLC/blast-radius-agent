@@ -109,7 +109,6 @@ class OrbitCLIClient:
         # on monorepo-scale graphs. 500 ids per query is conservative.
         CHUNK_SIZE = 500
         results: dict[int, dict] = {}  # dedupe by id
-        import itertools
         for i in range(0, len(ids), CHUNK_SIZE):
             chunk = ids[i:i + CHUNK_SIZE]
             id_list = ",".join(str(i) for i in chunk)
