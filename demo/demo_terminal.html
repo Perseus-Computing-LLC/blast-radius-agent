@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Blast Radius Analyzer — Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px;
+  }
+  .terminal {
+    width: 1100px;
+    max-width: 100%;
+    background: #161b22;
+    border-radius: 8px;
+    border: 1px solid #30363d;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(88, 166, 255, 0.1);
+  }
+  .titlebar {
+    background: #21262d;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #30363d;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red { background: #ff5f56; }
+  .dot.yellow { background: #ffbd2e; }
+  .dot.green { background: #27c93f; }
+  .titlebar-text {
+    color: #8b949e;
+    font-size: 12px;
+    margin-left: 12px;
+  }
+  .screen {
+    height: 380px;
+    padding: 16px 20px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    scroll-behavior: smooth;
+  }
+  .screen::-webkit-scrollbar { width: 6px; }
+  .screen::-webkit-scrollbar-track { background: #0d1117; }
+  .screen::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+  .line { margin: 2px 0; opacity: 0; animation: fadeIn 0.3s forwards; white-space: pre-wrap; word-break: break-word; }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  .label { color: #8b949e; font-size: 11px; margin: 8px 0 4px; border-top: 1px solid #21262d; padding-top: 8px; }
+  .user { color: #58a6ff; }
+  .user::before { content: '▸ '; }
+  .agent { color: #3fb950; }
+  .agent::before { content: '● '; }
+  .system { color: #bc8cff; }
+  .system::before { content: '◆ '; }
+  .memory { color: #d2991d; }
+  .memory::before { content: '◈ '; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .badge.store { background: #1f3a1f; color: #3fb950; }
+  .badge.recall { background: #1a2e3a; color: #58a6ff; }
+  .badge.insight { background: #2e1a3a; color: #bc8cff; }
+  .badge.risk { background: #3a1a1a; color: #f0883e; }
+
+  .highlight { color: #f0883e; font-weight: bold; }
+  .critical { color: #ff5f56; font-weight: bold; }
+  .low { color: #3fb950; }
+
+  @keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  .cursor { animation: cursor-blink 0.8s infinite; }
+</style>
+</head>
+<body>
+<div class="terminal">
+  <div class="titlebar">
+    <div class="dot red"></div>
+    <div class="dot yellow"></div>
+    <div class="dot green"></div>
+    <span class="titlebar-text">blast-radius-agent — demo</span>
+  </div>
+  <div class="screen" id="screen"></div>
+</div>
+
+<script>
+const screen = document.getElementById('screen');
+
+const SCENES = [
+  // Scene 1: The Problem
+  { delay: 0, lines: [
+    ['label', '── Issue #284: Refactor checkToken return type ──'],
+    ['system', 'GitLab issue · opened by @backend-lead'],
+    ['user', 'We need to change checkToken() to return Result&lt;Token, Error&gt; instead of Token | null.'],
+    ['user', 'Current signature: function checkToken(t: string): Token | null'],
+    ['user', 'New signature: function checkToken(t: string): Result&lt;Token, Error&gt;'],
+    ['system', 'This is a one-line change. Easy, right?'],
+    ['agent', '⚠ Wait. What depends on checkToken?'],
+  ]},
+  // Scene 2: The Solution
+  { delay: 1000, lines: [
+    ['label', ''],
+    ['label', '── Issue #284 (continued) ──'],
+    ['system', '@blast-radius is enabled on this project.'],
+    ['user', '@blast-radius src/auth/tokens.py -- checkToken'],
+    ['system', '<span class="badge recall">querying</span> Agent dispatched to Duo Agent Platform...'],
+  ]},
+  // Scene 3: Live Demo — Agent queries Orbit
+  { delay: 800, lines: [
+    ['label', ''],
+    ['label', '── Blast Radius Analysis — checkToken ──'],
+    ['system', '<span class="badge store">Orbit</span> get_graph_schema() → nodes: gl_definition, gl_reference'],
+    ['system', '<span class="badge store">Orbit</span> query_graph("MATCH (d:gl_definition) WHERE d.path CONTAINS \'tokens.py\'")'],
+    ['memory', 'Found: checkToken → gl_definition {id: 42, path: "src/auth/tokens.py", language: "typescript"}'],
+    ['system', '<span class="badge store">Orbit</span> query_graph("MATCH (s)-[r:gl_reference]->(d) WHERE d.id = 42")'],
+    ['memory', 'Direct references: 3 files found'],
+    ['system', '<span class="badge store">Orbit</span> query_graph("TRANSITIVE — 2 levels deep")'],
+    ['memory', 'Transitive references: 12 files found across 3 projects'],
+  ]},
+  // Scene 4: Risk Report
+  { delay: 600, lines: [
+    ['label', ''],
+    ['label', '── Risk Report ──'],
+    ['system', '<span class="badge insight">report</span> Posting analysis to issue #284...'],
+    ['agent', 'DIRECT IMPACT (3 files):'],
+    ['agent', '  src/api/middleware.ts:47         imports checkToken'],
+    ['agent', '  src/graphql/resolvers.ts:112     calls via auth middleware'],
+    ['agent', '  src/webhooks/stripe.ts:89        validates webhook tokens'],
+    ['agent', ''],
+    ['agent', 'TRANSITIVE IMPACT (12 files):'],
+    ['agent', '  src/api/routes/*.ts (5 files)    all routes use middleware'],
+    ['agent', '  src/graphql/schema/*.ts (4 files) import resolvers'],
+    ['agent', '  services/billing/handler.ts       calls webhook handler'],
+    ['agent', '  services/notifications/hook.ts    calls webhook handler'],
+    ['agent', '  services/auth-proxy/verify.ts     calls webhook handler'],
+    ['agent', ''],
+    ['agent', 'PROJECT IMPACT:'],
+    ['agent', '  core-api · billing-service · notifications-service'],
+    ['agent', ''],
+    ['agent', '<span class="highlight">RISK SCORE: HIGH</span><span class="badge risk">HIGH</span>'],
+    ['agent', '15 dependents across 3 projects.'],
+    ['agent', ''),
+    ['agent', 'RECOMMENDED: Notify @backend-team, @billing-team'],
+    ['agent', 'and @notifications-team before landing this change.'],
+  ]},
+  // Scene 5: What Changes
+  { delay: 2000, lines: [
+    ['label', ''],
+    ['label', '── Issue #284 (updated) ──'],
+    ['user', '@backend-team @billing-team @notifications-team — blast radius is HIGH.'],
+    ['user', 'Can you all review before I land this refactor?'],
+    ['system', '✅ Blast radius caught what CI would have missed.'],
+    ['system', '✅ Right teams notified before the change landed.'],
+    ['system', '✅ Zero broken builds. Zero rollbacks. Zero surprise incidents.'],
+    ['agent', ''],
+    ['agent', '<span class="low">✓</span> Before Blast Radius: ship → break → CI catches it (hours later)'],
+    ['agent', '<span class="low">✓</span> After Blast Radius: query → understand → notify → ship safely'],
+    ['agent', ''],
+    ['agent', '<span class="highlight">github.com/tcconnally/blast-radius-agent</span>  ·  MIT License'],
+    ['agent', 'GitLab Transcend Hackathon 2026 · Showcase Track'],
+  ]},
+];
+
+let sceneIndex = 0;
+let lineIndex = 0;
+let allDone = false;
+
+function addLine(type, text) {
+  const div = document.createElement('div');
+  div.className = `line ${type}`;
+  div.innerHTML = text + (type === 'user' ? '<span class="cursor">▌</span>' : '');
+  screen.appendChild(div);
+  screen.scrollTo({top: screen.scrollHeight, behavior: 'smooth'});
+}
+
+function playNextLine() {
+  if (allDone) return;
+
+  if (sceneIndex >= SCENES.length) {
+    allDone = true;
+    return;
+  }
+
+  const scene = SCENES[sceneIndex];
+
+  if (lineIndex >= scene.lines.length) {
+    sceneIndex++;
+    lineIndex = 0;
+    if (sceneIndex < SCENES.length) {
+      setTimeout(playNextLine, SCENES[sceneIndex].delay);
+    } else {
+      allDone = true;
+    }
+    return;
+  }
+
+  const [type, text] = scene.lines[lineIndex];
+  addLine(type, text);
+  lineIndex++;
+
+  let nextDelay = type === 'label' ? 600 :
+                  type === 'system' ? 500 :
+                  type === 'memory' ? 400 :
+                  type === 'agent' ? 700 :
+                  type === 'user' ? 600 : 500;
+
+  setTimeout(playNextLine, nextDelay);
+}
+
+setTimeout(playNextLine, 800);
+</script>
+</body>
+</html>
