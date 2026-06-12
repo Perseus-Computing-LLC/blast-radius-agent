@@ -65,16 +65,19 @@ Blast Radius Analyzer is a **custom agent** on the GitLab Duo Agent Platform. It
 2. **Use in any issue or MR**: Comment `@blast-radius src/components/Auth.tsx`
 3. **Read the report**: Agent posts a dependency analysis as a comment
 
-### Run Locally
+### Run Locally with Orbit CLI
 
 ```bash
-# Install Orbit CLI
-curl -fsSL "https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/raw/main/install.sh" | bash
+# Install Orbit CLI (v1.x)
+curl -fsSL "https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/raw/v1.0.0/install.sh" | bash
 
 # Index your project
 orbit index /path/to/your/project
 
-# Query blast radius manually
+# Analyze blast radius
+./bin/blast-radius-local.sh src/auth/tokens.py 3
+
+# Or query manually
 orbit sql "SELECT t2.name FROM gl_definition t1 JOIN gl_reference ON t1.id = gl_reference.target_id JOIN gl_definition t2 ON gl_reference.source_id = t2.id WHERE t1.path LIKE '%auth.py'"
 ```
 

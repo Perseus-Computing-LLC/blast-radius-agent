@@ -1,8 +1,9 @@
 # Demo Video Script — Blast Radius Analyzer
 
 **Target:** 2:45-2:55 (under 3-minute limit)
-**Style:** Screen recording of GitLab UI + voiceover
+**Style:** Screen recording of GitLab UI + voiceover (simulated terminal)
 **Upload:** YouTube (public)
+**Note:** This demo uses a terminal simulation to illustrate the agent flow. In a production environment, the agent would be invoked by mentioning @blast-radius in a real GitLab issue or MR.
 
 ---
 

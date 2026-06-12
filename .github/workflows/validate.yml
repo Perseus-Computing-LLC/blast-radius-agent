@@ -1,0 +1,20 @@
+name: validate
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate agent-manifest.json
+        run: python3 -c "import json; d=json.load(open('agent-manifest.json')); assert d['name']=='blast-radius-analyzer'; print('manifest OK')"
+      - name: Check required files exist
+        run: |
+          for f in README.md AGENTS.md LICENSE .gitignore .env.example agent-manifest.json; do
+            test -f "$f" && echo "✓ $f" || { echo "✗ $f missing"; exit 1; }
+          done
+      - name: Validate SKILL.md structure
+        run: |
+          head -4 skills/blast-radius/SKILL.md | grep -q "^---" && echo "✓ SKILL.md frontmatter OK" || echo "✗ SKILL.md missing frontmatter"
+      - name: Check shellscript syntax
+        run: bash -n bin/blast-radius-local.sh && echo "✓ shell syntax OK"

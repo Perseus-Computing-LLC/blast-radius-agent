@@ -108,26 +108,56 @@ Orbit represents code as a graph:
 ## Blast Radius Traversal Algorithm
 
 ```
-function blast_radius(target_path, max_depth=3):
-    target = query_graph("MATCH (d:gl_definition) WHERE d.path CONTAINS target_path")
+function blast_radius(target_query, max_depth=3):
+    # Phase 1: Resolve target
+    targets = query_graph(
+        "MATCH (d:gl_definition) WHERE d.path CONTAINS target_query " +
+        "OR d.name = target_query RETURN d.id, d.path"
+    )
+    if targets is empty:
+        return {error: "No matching definition found for '" + target_query + "'"}
+    if len(targets) > 1:
+        return {error: "Multiple matches (" + len(targets) + "). Use a more specific path: " +
+                join([t.path for t in targets])}
     
-    direct = query_graph("MATCH (s)-[r:gl_reference]->(d) WHERE d.id = target.id")
+    target = targets[0]
+    visited = Set(target.id)
+    all_dependents = List()
     
-    transitive = []
-    visited = {target.id}
-    current_level = {ref.source_id for ref in direct}
+    # Phase 2: Direct dependents (depth 1)
+    direct = query_graph(
+        "MATCH (s)-[r:gl_reference]->(d:gl_definition) " +
+        "WHERE d.id = " + target.id + " " +
+        "RETURN DISTINCT s.id, s.path, s.project_path"
+    )
+    all_dependents = direct
+    visited = visited + {d.id for d in direct}
+    current_level = direct
     
-    for depth in 2..max_depth:
+    # Phase 3: Transitive dependents (depth 2..max_depth)
+    for depth in 2 to max_depth:
+        if current_level is empty:
+            break  # No more dependents to traverse
+        
         next_level = query_graph(
-            "MATCH (s)-[r:gl_reference]->(d) WHERE d.id IN current_level"
+            "MATCH (s)-[r:gl_reference]->(d:gl_definition) " +
+            "WHERE d.id IN " + [n.id for n in current_level] + " " +
+            "AND NOT s.id IN " + visited + " " +  # Cycle detection
+            "RETURN DISTINCT s.id, s.path, s.project_path"
         )
-        transitive.extend(next_level)
-        current_level = {ref.source_id for ref in next_level} - visited
-        visited |= current_level
+        
+        all_dependents.extend(next_level)
+        visited = visited + {n.id for n in next_level}
+        current_level = next_level
     
-    projects = distinct_project_paths(direct + transitive)
+    # Phase 4: Separate into direct vs transitive
+    direct_set = {d.id for d in direct}
+    transitive = [d for d in all_dependents if d.id not in direct_set]
     
-    return classify_risk(direct, transitive, projects)
+    # Phase 5: Project impact
+    projects = distinct(d.project_path for d in all_dependents)
+    
+    return classify_risk(direct, transitive, all_dependents, projects)
 ```
 
 ## Deployment
