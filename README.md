@@ -65,7 +65,7 @@ Blast Radius Analyzer is a **custom agent** on the GitLab Duo Agent Platform. It
 2. **Use in any issue or MR**: Comment `@blast-radius src/components/Auth.tsx`
 3. **Read the report**: Agent posts a dependency analysis as a comment
 
-### Run Locally
+### Run Locally with Orbit CLI
 
 The repo ships a real local engine (`blast_radius/`) that wraps the Orbit CLI
 and implements cycle-safe, depth-limited traversal with deterministic risk
@@ -80,6 +80,8 @@ pip install -e .
 #    https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/releases
 #    e.g. download the release for your platform, verify its checksum, then:
 #    chmod +x orbit && sudo mv orbit /usr/local/bin/
+# Install Orbit CLI (v1.x)
+curl -fsSL "https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/raw/v1.0.0/install.sh" | bash
 
 # 3. Index your project
 orbit index /path/to/your/project
@@ -88,6 +90,11 @@ orbit index /path/to/your/project
 blast-radius src/auth/tokens.py --function checkToken
 #   or, fully offline against a graph fixture (no Orbit needed):
 blast-radius src/auth/tokens.py --graph tests/fixtures/sample_graph.json --json
+# Analyze blast radius
+./bin/blast-radius-local.sh src/auth/tokens.py 3
+
+# Or query manually
+orbit sql "SELECT t2.name FROM gl_definition t1 JOIN gl_reference ON t1.id = gl_reference.target_id JOIN gl_definition t2 ON gl_reference.source_id = t2.id WHERE t1.path LIKE '%auth.py'"
 ```
 
 Configuration is read from `.env` (see `.env.example`): Orbit mode, CLI path,

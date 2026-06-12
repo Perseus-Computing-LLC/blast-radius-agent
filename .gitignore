@@ -2,6 +2,8 @@
 .env
 .env.local
 *.local
+# Environment
+.env
 
 # Python
 __pycache__/
@@ -24,3 +26,7 @@ venv/
 
 # OS noise
 .DS_Store
+
+# OS
+.DS_Store
+Thumbs.db

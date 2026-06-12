@@ -21,16 +21,21 @@ Use `get_graph_schema` to list available node types and relationships in the Orb
 - `gl_definition` — files, functions, classes, modules
 - `gl_reference` — edges connecting definitions (source depends on target)
 
-### Step 2: Find the Definition
+### Step 2: Find the Definition (SQL mode — Orbit CLI)
 
 Query `gl_definition` nodes matching the target file or function:
 
 ```sql
--- Orbit SQL (CLI local mode)
-SELECT * FROM gl_definition WHERE path LIKE '%target_file.py%' OR name = 'functionName'
+SELECT * FROM gl_definition WHERE path LIKE '%target_file%' OR name = 'functionName';
 ```
 
-Or via MCP: use `query_graph` with a filter on name or path.
+### Step 2b: Find the Definition (Cypher mode — Orbit Remote/MCP)
+
+```
+query_graph("MATCH (d:gl_definition) WHERE d.path CONTAINS 'target_file' RETURN d.id, d.name, d.path")
+```
+
+Note: The SQL syntax is used with Orbit CLI (`orbit sql ...`). The Cypher-style syntax is used with Orbit Remote (`query_graph` MCP tool). Pick the one that matches your Orbit access mode.
 
 ### Step 3: Trace Direct References
 
@@ -92,6 +97,12 @@ overlapping boundaries). Thresholds are configurable via `.env`.
 
 The reference implementation of these rules lives in `blast_radius/risk.py`
 and is covered by boundary tests in `tests/test_risk.py`.
+| Risk Level | Criteria |
+|---|---|
+| **Low** | 0-2 direct dependents, no transitive dependents |
+| **Medium** | 3-10 direct dependents, or 1-5 transitive |
+| **High** | 11-50 direct dependents, or 6-20 transitive |
+| **Critical** | 51+ dependents, or hits a shared library used across 3+ projects, or 21+ transitive dependents |
 
 ## Response Format
 
@@ -133,6 +144,30 @@ orbit sql "SELECT DISTINCT relationship_type FROM gl_reference"
 # Count dependents per file (hotspot analysis)
 orbit sql "SELECT t1.path, COUNT(gl_reference.source_id) as dependents FROM gl_definition t1 JOIN gl_reference ON t1.id = gl_reference.target_id GROUP BY t1.path ORDER BY dependents DESC LIMIT 20"
 ```
+
+## Target Resolution
+
+### Zero matches
+
+If `query_graph` returns no matching `gl_definition` nodes:
+
+1. Confirm the file path is relative to the repository root
+2. Try searching by file name only (e.g., `tokens.py` instead of `src/auth/tokens.py`)
+3. Try searching by function/class name instead
+4. If still no match, the repository may not be fully indexed. Run `orbit index` (local) or check Orbit Remote indexing status.
+5. Return: `{error: "No matching definition found for '<query>'. Try a different path or function name."}`
+
+### Multiple matches
+
+If the query matches multiple definitions (e.g., `auth.py` matches `src/auth/auth.py` and `tests/auth/auth.py`):
+
+1. List all matches with their full paths
+2. Ask the developer to specify a more precise path
+3. Return: `{ambiguous: true, matches: [path1, path2, ...], message: "Multiple matches found. Use the full path from repository root."}`
+
+### File not in graph (not yet indexed)
+
+Some files may not appear in the knowledge graph if they were added after the last index run. Inform the developer and suggest re-indexing.
 
 ## Pitfalls
 

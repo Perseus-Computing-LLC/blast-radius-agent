@@ -147,6 +147,56 @@ function blast_radius(target_path, function_name=None, max_depth=3):
 
     projects = distinct_project_paths(direct + [d for d, _ in transitive])
     return classify_risk(len(direct), len(transitive), len(projects))
+function blast_radius(target_query, max_depth=3):
+    # Phase 1: Resolve target
+    targets = query_graph(
+        "MATCH (d:gl_definition) WHERE d.path CONTAINS target_query " +
+        "OR d.name = target_query RETURN d.id, d.path"
+    )
+    if targets is empty:
+        return {error: "No matching definition found for '" + target_query + "'"}
+    if len(targets) > 1:
+        return {error: "Multiple matches (" + len(targets) + "). Use a more specific path: " +
+                join([t.path for t in targets])}
+    
+    target = targets[0]
+    visited = Set(target.id)
+    all_dependents = List()
+    
+    # Phase 2: Direct dependents (depth 1)
+    direct = query_graph(
+        "MATCH (s)-[r:gl_reference]->(d:gl_definition) " +
+        "WHERE d.id = " + target.id + " " +
+        "RETURN DISTINCT s.id, s.path, s.project_path"
+    )
+    all_dependents = direct
+    visited = visited + {d.id for d in direct}
+    current_level = direct
+    
+    # Phase 3: Transitive dependents (depth 2..max_depth)
+    for depth in 2 to max_depth:
+        if current_level is empty:
+            break  # No more dependents to traverse
+        
+        next_level = query_graph(
+            "MATCH (s)-[r:gl_reference]->(d:gl_definition) " +
+            "WHERE d.id IN " + [n.id for n in current_level] + " " +
+            "AND NOT s.id IN " + visited + " " +  # Cycle detection
+            "RETURN DISTINCT s.id, s.path, s.project_path"
+        )
+        
+        all_dependents.extend(next_level)
+        visited = visited + {n.id for n in next_level}
+        current_level = next_level
+    
+    # Phase 4: Separate into direct vs transitive
+    direct_set = {d.id for d in direct}
+    transitive = [d for d in all_dependents if d.id not in direct_set]
+    
+    # Phase 5: Project impact
+    projects = distinct(d.project_path for d in all_dependents)
+    
+    return classify_risk(direct, transitive, all_dependents, projects)
 ```
 
 > **Note on dialects (issue #2):** the sequence diagram above shows Cypher-style
