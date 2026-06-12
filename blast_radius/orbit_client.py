@@ -41,6 +41,13 @@ def _sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE metacharacters and return (escaped_value, escape_char)."""
+    # B-1: LIKE wildcards unescaped would silently change match semantics
+    v = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return v
+
+
 class OrbitCLIClient:
     """Talks to a real Orbit index via the `orbit sql` command."""
 
@@ -80,7 +87,8 @@ class OrbitCLIClient:
         # Prefer an exact path match; fall back to suffix match for convenience.
         if path:
             p = _sql_literal(path)
-            clauses.append(f"(path = '{p}' OR path LIKE '%/{p}' OR path LIKE '%{p}')")
+            p_like = _escape_like(p)
+            clauses.append(f"(path = '{p}' OR path LIKE '%/{p_like}' ESCAPE '\\\\' )")
         if name:
             clauses.append(f"name = '{_sql_literal(name)}'")
         if not clauses:
