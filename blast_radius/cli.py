@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -69,7 +70,14 @@ def main(argv=None) -> int:
         )
 
     if args.graph:
-        graph = json.loads(Path(args.graph).read_text(encoding="utf-8"))
+        try:
+            graph = json.loads(Path(args.graph).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            sys.stderr.write(f"Error: graph fixture not found: {args.graph}\n")
+            return 5
+        except json.JSONDecodeError as exc:
+            sys.stderr.write(f"Error: invalid JSON in graph fixture {args.graph}: {exc}\n")
+            return 5
         client = InMemoryOrbitClient(graph)
     else:
         cli_client = OrbitCLIClient(cli_path=config.orbit_cli_path)
@@ -90,6 +98,21 @@ def main(argv=None) -> int:
         for c in exc.candidates:
             sys.stderr.write(f"  candidate: {c.get('path')} ({c.get('name')})\n")
         return 3
+    # B-3: catch Orbit subprocess errors and other runtime failures
+    # so callers (including agent wrappers) get clean one-line errors
+    # and distinct exit codes instead of raw tracebacks.
+    except subprocess.TimeoutExpired:
+        sys.stderr.write(
+            "Error: Orbit CLI timed out. Check GITLAB_TOKEN and network, "
+            "or use --graph FIXTURE.json for offline mode.\n"
+        )
+        return 4
+    except RuntimeError as exc:
+        sys.stderr.write(f"Error: {exc}\n")
+        return 4
+    except Exception as exc:
+        sys.stderr.write(f"Error: {type(exc).__name__}: {exc}\n")
+        return 4
 
     if args.json:
         print(json.dumps(_report_to_dict(report), indent=2))
