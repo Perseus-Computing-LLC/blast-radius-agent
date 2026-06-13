@@ -31,7 +31,7 @@ class OrbitClient(Protocol):
         """Return gl_definition rows matching path and/or name (exact-aware)."""
         ...
 
-    def dependents_of(self, target_ids: Iterable[int]) -> List[dict]:
+    def dependents_of(self, target_ids: Iterable[int], max_dependents: int = 0) -> List[dict]:
         """Return gl_definition rows that reference any of target_ids (reverse edge)."""
         ...
 
@@ -92,20 +92,40 @@ class OrbitCLIClient:
         )
         return self._run_sql(sql)
 
-    def dependents_of(self, target_ids: Iterable[int]) -> List[dict]:
+    def dependents_of(self, target_ids: Iterable[int], max_dependents: int = 0) -> List[dict]:
         ids = sorted({int(i) for i in target_ids})
         if not ids:
             return []
-        id_list = ",".join(str(i) for i in ids)
-        sql = (
-            "SELECT DISTINCT t2.id AS id, t2.name AS name, t2.path AS path, "
-            "t2.language AS language, t2.project_path AS project_path "
-            "FROM gl_definition t1 "
-            "JOIN gl_reference ON t1.id = gl_reference.target_id "
-            "JOIN gl_definition t2 ON gl_reference.source_id = t2.id "
-            f"WHERE t1.id IN ({id_list})"
-        )
-        return self._run_sql(sql)
+        # Chunk the frontier to keep SQL IN-lists bounded (issue #39 B-2).
+        # On monorepo-scale graphs a hot symbol's frontier can be tens of
+        # thousands of ids — megabyte SQL strings and unbounded memory.
+        CHUNK_SIZE = 500
+        if len(ids) <= CHUNK_SIZE:
+            chunks = [ids]
+        else:
+            chunks = [ids[i:i + CHUNK_SIZE] for i in range(0, len(ids), CHUNK_SIZE)]
+        seen: set[int] = set()
+        rows: list[dict] = []
+        for chunk in chunks:
+            if max_dependents and len(seen) >= max_dependents:
+                break
+            id_list = ",".join(str(i) for i in chunk)
+            sql = (
+                "SELECT DISTINCT t2.id AS id, t2.name AS name, t2.path AS path, "
+                "t2.language AS language, t2.project_path AS project_path "
+                "FROM gl_definition t1 "
+                "JOIN gl_reference ON t1.id = gl_reference.target_id "
+                "JOIN gl_definition t2 ON gl_reference.source_id = t2.id "
+                f"WHERE t1.id IN ({id_list})"
+            )
+            for row in self._run_sql(sql):
+                rid = int(row["id"])
+                if rid not in seen:
+                    seen.add(rid)
+                    rows.append(row)
+                    if max_dependents and len(seen) >= max_dependents:
+                        break
+        return rows
 
 
 class InMemoryOrbitClient:
@@ -138,7 +158,7 @@ class InMemoryOrbitClient:
             out.append(dict(d))
         return out
 
-    def dependents_of(self, target_ids: Iterable[int]) -> List[dict]:
+    def dependents_of(self, target_ids: Iterable[int], max_dependents: int = 0) -> List[dict]:
         targets = {int(i) for i in target_ids}
         source_ids = {
             int(r["source_id"]) for r in self._refs if int(r["target_id"]) in targets

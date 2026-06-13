@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +22,14 @@ from .config import Config
 from .engine import BlastRadiusEngine, TargetResolutionError
 from .orbit_client import InMemoryOrbitClient, OrbitCLIClient
 from .report import format_report
+
+
+# Exit codes so callers (and the agent.yml wrapper) can distinguish
+# retryable failures from fatal input errors.
+EX_USAGE = 2      # bad command-line arguments
+EX_TARGET = 3     # target resolution failed
+EX_ORBIT = 4      # Orbit CLI unavailable or failed
+EX_FIXTURE = 5    # graph fixture is malformed or missing
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -63,13 +72,22 @@ def main(argv=None) -> int:
             gitlab_url=config.gitlab_url,
             gitlab_token=config.gitlab_token,
             max_depth=args.max_depth,
+            max_dependents=config.max_dependents,
             exclude_patterns=config.exclude_patterns,
             thresholds=config.thresholds,
             cross_project_critical=config.cross_project_critical,
         )
 
     if args.graph:
-        graph = json.loads(Path(args.graph).read_text(encoding="utf-8"))
+        graph_path = Path(args.graph)
+        try:
+            graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            sys.stderr.write(f"Error: graph fixture not found: {graph_path}\n")
+            return EX_FIXTURE
+        except json.JSONDecodeError as exc:
+            sys.stderr.write(f"Error: invalid JSON in graph fixture {graph_path}: {exc}\n")
+            return EX_FIXTURE
         client = InMemoryOrbitClient(graph)
     else:
         cli_client = OrbitCLIClient(cli_path=config.orbit_cli_path)
@@ -79,7 +97,7 @@ def main(argv=None) -> int:
                 f"(ORBIT_CLI_PATH={config.orbit_cli_path!r}). "
                 "Install Orbit CLI or pass --graph FIXTURE.json for offline mode.\n"
             )
-            return 2
+            return EX_USAGE
         client = cli_client
 
     engine = BlastRadiusEngine(client, config)
@@ -89,7 +107,17 @@ def main(argv=None) -> int:
         sys.stderr.write(f"Target resolution failed: {exc}\n")
         for c in exc.candidates:
             sys.stderr.write(f"  candidate: {c.get('path')} ({c.get('name')})\n")
-        return 3
+        return EX_TARGET
+    except subprocess.TimeoutExpired as exc:
+        sys.stderr.write(
+            f"Error: Orbit CLI timed out after {exc.timeout}s "
+            f"(command: {' '.join(exc.cmd)}). "
+            "Increase ORBIT_TIMEOUT or check your Orbit index.\n"
+        )
+        return EX_ORBIT
+    except RuntimeError as exc:
+        sys.stderr.write(f"Error: Orbit CLI failed: {exc}\n")
+        return EX_ORBIT
 
     if args.json:
         print(json.dumps(_report_to_dict(report), indent=2))

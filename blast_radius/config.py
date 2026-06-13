@@ -72,6 +72,7 @@ class Config:
     exclude_patterns: List[str] = field(default_factory=list)
     thresholds: RiskThresholds = field(default_factory=RiskThresholds)
     cross_project_critical: int = 3
+    max_dependents: int = 0  # 0 = no cap; set to short-circuit at N dependents
 
     @classmethod
     def load(cls, dotenv_path: Optional[str] = None) -> "Config":
@@ -94,6 +95,7 @@ class Config:
             gitlab_url=os.environ.get("GITLAB_URL", "https://gitlab.com"),
             gitlab_token=os.environ.get("GITLAB_TOKEN") or None,
             max_depth=int(os.environ.get("BLAST_RADIUS_MAX_DEPTH", "3")),
+            max_dependents=int(os.environ.get("BLAST_RADIUS_MAX_DEPENDENTS", "0")),
             exclude_patterns=excludes,
             thresholds=RiskThresholds.from_env(),
             cross_project_critical=int(

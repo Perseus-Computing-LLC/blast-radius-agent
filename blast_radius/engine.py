@@ -116,7 +116,7 @@ class BlastRadiusEngine:
 
         # Level 1: direct dependents.
         frontier: Set[int] = set()
-        for row in self.client.dependents_of(target_ids):
+        for row in self.client.dependents_of(target_ids, max_dependents=self.config.max_dependents):
             did = int(row["id"])
             if did in visited or self._excluded(row.get("path", "")):
                 continue
@@ -128,7 +128,7 @@ class BlastRadiusEngine:
         depth = 2
         while frontier and depth <= self.config.max_depth:
             next_frontier: Set[int] = set()
-            for row in self.client.dependents_of(frontier):
+            for row in self.client.dependents_of(frontier, max_dependents=self.config.max_dependents):
                 did = int(row["id"])
                 if did in visited or self._excluded(row.get("path", "")):
                     continue
