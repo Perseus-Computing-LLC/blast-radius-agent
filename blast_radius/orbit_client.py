@@ -41,6 +41,18 @@ def _sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _like_literal(value: str) -> str:
+    """Escape LIKE-pattern metacharacters, then SQL-literal-escape.
+
+    SQL LIKE treats _ (single char) and % (any chars) as wildcards.
+    A path containing e.g. ``auth_session.py`` would match unintended
+    files unless escaped.  The backslash is the LIKE escape character
+    on all major SQL engines.
+    """
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return _sql_literal(escaped)
+
+
 class OrbitCLIClient:
     """Talks to a real Orbit index via the `orbit sql` command."""
 
