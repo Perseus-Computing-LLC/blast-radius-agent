@@ -1,93 +1,134 @@
-# Blast Radius — Dependency Impact Analysis for GitLab
+# Blast Radius Analyzer
 
-**Don't guess what breaks. Mention. Analyze. Ship.**
+**Trace cross-file dependencies before you break things.**
 
-Blast Radius maps the dependency chain before every code change. One mention — `@blast-radius src/auth/tokens.py` — and the agent traces every file that depends on your change: direct, transitive, across projects. GitLab-native, powered by Orbit's knowledge graph.
+Every developer has shipped a change that broke something downstream — a function signature change that killed an import three projects away, a moved constant that crashed a service you forgot depended on it. CI caught it hours later.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Hackathon: GitLab Transcend](https://img.shields.io/badge/hackathon-GitLab%20Transcend-orange)](https://gitlab-transcend.devpost.com/)
+Blast Radius Analyzer fixes this. It's a GitLab Duo custom agent powered by **GitLab Orbit's knowledge graph** that maps every dependency chain before you change code.
 
-## The Visual
+Mention `@blast-radius` with a file path in any issue or MR comment, and the agent traverses Orbit's dependency graph to show you:
+
+- **Direct impact** — every file that imports your changed code
+- **Transitive impact** — every file that depends on those dependents
+- **Project impact** — which projects are in the blast radius
+- **Risk score** — Low/Medium/High/Critical
+
+## Demo
 
 ```
-                  DIRECT (12 files)
-                 /    |    \    \
-              api   db   ui   sdk
-             /  \   |    |    /  \
-        cli  server  ·   ·  tests  worker
-        ·     ·     ·   ·    ·      ·
-      (Transitive: 47 files across 3 projects)
-```
+Developer: @blast-radius src/auth/tokens.py -- checkToken function
 
-The tool's value is visual — the blast diagram IS the product. See the [website](https://perseus.observer/blast-radius/) for the interactive SVG.
+@blast-radius:
+  DIRECT IMPACT (3 files):
+  - src/api/middleware.ts:47 — imports checkToken
+  - src/graphql/resolvers.ts:112 — calls checkToken via auth middleware
+  - src/webhooks/stripe.ts:89 — validates webhook tokens
+
+  TRANSITIVE IMPACT (12 files):
+  - src/api/routes/*.ts — all routes use middleware
+  - src/graphql/schema/*.ts — schema files import resolvers
+  - 3 downstream microservices import the webhook handler
+
+  PROJECT IMPACT: core-api, billing-service, notifications-service
+  RISK SCORE: HIGH — 15 dependents across 3 projects
+
+  Recommended: notify @backend-team before landing this change.
+```
 
 ## How It Works
 
-```
-@blast-radius src/auth/tokens.py --function checkToken
-```
+Blast Radius Analyzer is a **custom agent** on the GitLab Duo Agent Platform. It uses GitLab Orbit's knowledge graph to traverse code dependencies:
 
-| Layer | Count | Example |
-|---|---|---|
-| **Direct Impact** | 12 files | `api/middleware.py` imports checkToken, `db/sessions.py` calls it on init |
-| **Transitive Impact** | 47 files | `cli/main.py` depends on middleware, `server/app.py` depends on sessions |
-| **Project Impact** | 3 projects | core-api, billing-service, notifications-service |
-| **Risk Score** | HIGH | 59 total dependents |
+1. Developer mentions `@blast-radius <file-path>` in a GitLab issue or MR
+2. Agent queries Orbit's `query_graph` to find all `gl_definition` nodes for the target file
+3. Traverses `gl_reference` edges backwards to find all callers and importers
+4. Recursively traverses to find transitive dependents
+5. Assembles a risk report and posts it as a comment
 
-## GitLab Native
+## Tech Stack
 
-Blast Radius plugs directly into GitLab Duo. No external services, no API keys.
-
-- **Orbit Knowledge Graph** — traverses `gl_definition` nodes and `gl_reference` edges to map every dependency
-- **MR Comment Integration** — results posted as structured comments in the MR thread
-- **CI/CD Pipeline** — run in CI with a single include in `.gitlab-ci.yml`
-
-```yaml
-# .gitlab-ci.yml
-include:
-  - template: Workflows/MergeRequest-Pipelines.gitlab-ci.yml
-
-blast_radius:
-  stage: test
-  script:
-    - blast-radius $CI_MERGE_REQUEST_DIFF_BASE_SHA..$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA
-```
-
-## Offline Fixture Mode
-
-Blast Radius bundles an offline fixture mode. The dependency graph is pre-computed from a snapshot — demos run identically every time, regardless of network availability or Orbit API status. **This is a feature, not a workaround.** Hackathon judges see exactly the same thing every time — no live service dependency.
-
-| Mode | How |
-|---|---|
-| **Live Orbit Query** | Real-time dependency traversal across active projects. Cypher-style `query_graph` and `get_graph_schema` tools. |
-| **Offline Fixture** | Pre-computed graph snapshot. Zero network calls. Identical output every run. |
+- **GitLab Duo Agent Platform** — custom agent hosting and invocation
+- **GitLab Orbit** — knowledge graph of the codebase (definitions, references, relationships)
+- **Agent Skills** — reusable skill files following the [Agent Skills spec](https://agentskills.io/specification)
+- **Orbit CLI** — local fallback using `orbit sql` for projects without Orbit Remote
 
 ## Quick Start
 
+### Prerequisites
+
+- GitLab account with access to a group that has Orbit enabled (or Orbit CLI installed locally)
+- A project with the Blast Radius Analyzer agent enabled
+
+### Setup
+
+1. **Enable the agent** in your GitLab project: Project → AI → Agents → Enable "Blast Radius Analyzer"
+2. **Use in any issue or MR**: Comment `@blast-radius src/components/Auth.tsx`
+3. **Read the report**: Agent posts a dependency analysis as a comment
+
+### Run Locally with Orbit CLI
+
+The repo ships a real local engine (`blast_radius/`) that wraps the Orbit CLI
+and implements cycle-safe, depth-limited traversal with deterministic risk
+scoring. It has zero third-party runtime dependencies.
+
 ```bash
-# Install
-pip install blast-radius-agent
+# 1. Install the local engine
+pip install -e .
 
-# Scan with Orbit CLI
+# 2. Install the Orbit CLI from a pinned release (do NOT pipe curl to bash from
+#    a mutable branch). Use the official package or a versioned release asset:
+#    https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/releases
+#    e.g. download the release for your platform, verify its checksum, then:
+#    chmod +x orbit && sudo mv orbit /usr/local/bin/
+# Install Orbit CLI (v1.x)
+curl -fsSL "https://gitlab.com/gitlab-org/orbit/knowledge-graph/-/raw/v1.0.0/install.sh" | bash
+
+# 3. Index your project
+orbit index /path/to/your/project
+
+# 4. Analyze blast radius
 blast-radius src/auth/tokens.py --function checkToken
-
-# Offline mode (no Orbit needed)
+#   or, fully offline against a graph fixture (no Orbit needed):
 blast-radius src/auth/tokens.py --graph tests/fixtures/sample_graph.json --json
+# Analyze blast radius
+./bin/blast-radius-local.sh src/auth/tokens.py 3
 
-# In GitLab: add agent to AI Catalog (Project → AI → Agents)
-# Then mention in any issue or MR: @blast-radius src/models/user.py
+# Or query manually
+orbit sql "SELECT t2.name FROM gl_definition t1 JOIN gl_reference ON t1.id = gl_reference.target_id JOIN gl_definition t2 ON gl_reference.source_id = t2.id WHERE t1.path LIKE '%auth.py'"
 ```
+
+Configuration is read from `.env` (see `.env.example`): Orbit mode, CLI path,
+max traversal depth, risk thresholds, and exclude patterns.
 
 ## Repository Structure
 
 ```
 blast-radius-agent/
-├── blast_radius/          # Local engine (Orbit CLI wrapper, cycle-safe traversal, risk scoring)
-├── skills/blast-radius/   # Reusable agent skill (SKILL.md)
-├── agent.yml              # GitLab Duo agent manifest
-├── docs/                  # Architecture, Orbit contract, submission content
-├── tests/                 # pytest suite + graph fixture
-└── demo/                  # Demo script + terminal simulation
+├── README.md                    # This file
+├── AGENTS.md                    # Context for AI agents working on this project
+├── agent.yml                    # Deployable GitLab Duo agent manifest
+├── pyproject.toml               # Package metadata + `blast-radius` entrypoint
+├── blast_radius/                # Local engine (Orbit CLI wrapper, traversal, risk)
+│   ├── cli.py                   # `blast-radius` / `python -m blast_radius`
+│   ├── engine.py                # Cycle-safe, depth-limited traversal
+│   ├── orbit_client.py          # Orbit CLI + in-memory fixture clients
+│   ├── risk.py                  # Deterministic risk classification
+│   └── config.py                # .env-driven configuration
+├── skills/
+│   └── blast-radius/
+│       └── SKILL.md             # Reusable blast-radius agent skill
+├── docs/
+│   ├── ARCHITECTURE.md          # Architecture diagrams and flow
+│   ├── ORBIT_CONTRACT.md        # Orbit/Duo tool contract (SQL vs Cypher modes)
+│   └── SUBMISSION.md            # Devpost submission content
+├── scripts/
+│   └── validate_skill.py        # CI validation for skill/manifest/fixture
+├── tests/                       # pytest suite + graph fixture
+├── demo/
+│   ├── demo_script.md           # 3-minute video script
+│   └── demo_terminal.html       # Terminal SIMULATION for demo video
+└── assets/
+    └── thumbnail.png            # Architecture diagram thumbnail
 ```
 
 ## License
@@ -96,4 +137,6 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-Built for the **GitLab Transcend Hackathon** — Showcase Track · [Website](https://perseus.observer/blast-radius/)
+Built for the **GitLab Transcend Hackathon** — Showcase Track.  
+Deadline: June 24, 2026 @ 2pm EDT.  
+Devpost: [gitlab-transcend.devpost.com](https://gitlab-transcend.devpost.com/)

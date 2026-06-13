@@ -41,21 +41,6 @@ def _sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
-def _like_literal(value: str) -> str:
-    """Escape a string for use inside a LIKE pattern (with ESCAPE '\\').
-
-    Without this, `%` and `_` in a user-supplied path act as wildcards:
-    `auth_session.py` would match `authXsession.py`, and a stray `%`
-    matches every file — inflating the blast radius and the risk verdict.
-    """
-    return (
-        value.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-        .replace("'", "''")
-    )
-
-
 class OrbitCLIClient:
     """Talks to a real Orbit index via the `orbit sql` command."""
 
@@ -95,12 +80,7 @@ class OrbitCLIClient:
         # Prefer an exact path match; fall back to suffix match for convenience.
         if path:
             p = _sql_literal(path)
-            lp = _like_literal(path)
-            clauses.append(
-                f"(path = '{p}' "
-                f"OR path LIKE '%/{lp}' ESCAPE '\\' "
-                f"OR path LIKE '%{lp}' ESCAPE '\\')"
-            )
+            clauses.append(f"(path = '{p}' OR path LIKE '%/{p}' OR path LIKE '%{p}')")
         if name:
             clauses.append(f"name = '{_sql_literal(name)}'")
         if not clauses:
@@ -116,28 +96,16 @@ class OrbitCLIClient:
         ids = sorted({int(i) for i in target_ids})
         if not ids:
             return []
-
-        # B-2: chunk large IN (...) lists to avoid megabyte SQL strings
-        # on monorepo-scale graphs. 500 ids per query is conservative.
-        CHUNK_SIZE = 500
-        results: dict[int, dict] = {}  # dedupe by id
-        for i in range(0, len(ids), CHUNK_SIZE):
-            chunk = ids[i:i + CHUNK_SIZE]
-            id_list = ",".join(str(i) for i in chunk)
-            sql = (
-                "SELECT DISTINCT t2.id AS id, t2.name AS name, t2.path AS path, "
-                "t2.language AS language, t2.project_path AS project_path "
-                "FROM gl_definition t1 "
-                "JOIN gl_reference ON t1.id = gl_reference.target_id "
-                "JOIN gl_definition t2 ON gl_reference.source_id = t2.id "
-                f"WHERE t1.id IN ({id_list})"
-            )
-            for row in self._run_sql(sql):
-                rid = int(row["id"])
-                if rid not in results:
-                    results[rid] = row
-
-        return list(results.values())
+        id_list = ",".join(str(i) for i in ids)
+        sql = (
+            "SELECT DISTINCT t2.id AS id, t2.name AS name, t2.path AS path, "
+            "t2.language AS language, t2.project_path AS project_path "
+            "FROM gl_definition t1 "
+            "JOIN gl_reference ON t1.id = gl_reference.target_id "
+            "JOIN gl_definition t2 ON gl_reference.source_id = t2.id "
+            f"WHERE t1.id IN ({id_list})"
+        )
+        return self._run_sql(sql)
 
 
 class InMemoryOrbitClient:
