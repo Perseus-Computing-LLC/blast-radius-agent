@@ -135,7 +135,7 @@ const SCENES = [
     ['label', '── Blast Radius Analysis — checkToken ──'],
     ['system', '<span class="badge store">Orbit</span> get_graph_schema() → nodes: gl_definition, gl_reference'],
     ['system', '<span class="badge store">Orbit</span> query_graph("MATCH (d:gl_definition) WHERE d.path CONTAINS \'tokens.py\'")'],
-    ['memory', 'Found: checkToken → gl_definition {id: 42, path: "src/auth/tokens.py", language: "typescript"}'],
+    ['memory', 'Found: checkToken → gl_definition {id: 42, path: "src/auth/tokens.py", language: "python"}'],
     ['system', '<span class="badge store">Orbit</span> query_graph("MATCH (s)-[r:gl_reference]->(d) WHERE d.id = 42")'],
     ['memory', 'Direct references: 3 files found'],
     ['system', '<span class="badge store">Orbit</span> query_graph("TRANSITIVE — 2 levels deep")'],
