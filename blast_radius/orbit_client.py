@@ -91,8 +91,9 @@ class OrbitCLIClient:
         clauses: List[str] = []
         # Prefer an exact path match; fall back to suffix match for convenience.
         if path:
-            p = _sql_literal(path)
-            clauses.append(f"(path = '{p}' OR path LIKE '%/{p}' OR path LIKE '%{p}')")
+            p_exact = _sql_literal(path)
+            p_like = _like_literal(path)
+            clauses.append(f"(path = '{p_exact}' OR path LIKE '%/{p_like}' ESCAPE '\\' OR path LIKE '%{p_like}' ESCAPE '\\')")
         if name:
             clauses.append(f"name = '{_sql_literal(name)}'")
         if not clauses:
