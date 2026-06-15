@@ -131,6 +131,26 @@ blast-radius-agent/
     └── thumbnail.png            # Architecture diagram thumbnail
 ```
 
+
+
+## Future: GitHub + Local Support
+
+Blast Radius currently requires GitLab Orbit for code graph data. Tree-sitter support
+is planned (see [#45](https://github.com/tcconnally/blast-radius-agent/issues/45))
+to enable analysis on any codebase without GitLab:
+
+- Walk local file tree with tree-sitter
+- Extract symbol definitions and references
+- Build in-memory graph matching the Orbit contract
+- Works on GitHub, Bitbucket, and local-only repos
+
+### Docker
+
+```bash
+docker build -t blast-radius .
+docker run blast-radius src/myfile.py --function main
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
