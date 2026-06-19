@@ -1,6 +1,15 @@
 # Blast Radius Analyzer
 
+[![CI](https://github.com/Perseus-Computing-LLC/blast-radius-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Perseus-Computing-LLC/blast-radius-agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Trace cross-file dependencies before you break things.**
+
+### Links
+
+- **Demo video:** https://youtube.com/watch?v=3tibXa-1udE
+- **GitLab AI Catalog agent:** https://gitlab.com/gitlab-ai-hackathon/transcend/39104977/-/automate/agents/1010753/
+- **GitLab project:** https://gitlab.com/gitlab-ai-hackathon/transcend/39104977
 
 Every developer has shipped a change that broke something downstream — a function signature change that killed an import three projects away, a moved constant that crashed a service you forgot depended on it. CI caught it hours later.
 
@@ -12,6 +21,24 @@ Mention `@blast-radius` with a file path in any issue or MR comment, and the age
 - **Transitive impact** — every file that depends on those dependents
 - **Project impact** — which projects are in the blast radius
 - **Risk score** — Low/Medium/High/Critical
+
+## How It Runs
+
+Blast Radius Analyzer has two run modes, and both ship in this repo:
+
+- **Demo / evaluation mode (default, no Orbit needed):** the engine runs against
+  an in-memory graph fixture (`tests/fixtures/sample_graph.json`). This is what
+  the test suite and the demo path exercise, so reviewers can clone and run the
+  full analysis offline with zero external services. The demo video uses a
+  terminal *simulation* (`demo/demo_terminal.html`) for a clean recording — it
+  is clearly labeled as such.
+- **Live mode:** the same engine shells out to `orbit sql` against an
+  Orbit-indexed repository (`blast_radius/orbit_client.py` → `OrbitCLIClient`).
+  Point it at a real Orbit graph and it traverses production dependency data.
+
+The traversal, cycle handling, and risk scoring are identical in both modes —
+only the graph source changes. Offline-first is a deliberate choice so the
+project is fully evaluable without provisioning Orbit.
 
 ## Demo
 
