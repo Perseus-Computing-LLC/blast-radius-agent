@@ -1,6 +1,6 @@
 # Claims Audit — blast-radius-agent
 
-**Date:** 2026-06-12 · **Audited:** README.md, AGENTS.md vs code on `main`
+**Date:** 2026-06-21 · **Audited:** README.md, AGENTS.md, SKILL.md vs code on `main`
 
 ## Findings (ranked by judge visibility)
 
@@ -9,12 +9,10 @@
 - **Claim:** "Mention `@blast-radius` in any issue or MR comment, and the agent traverses Orbit's dependency graph…"
 - **Resolution:** Agent created and published: `https://gitlab.com/gitlab-ai-hackathon/transcend/39104977/-/automate/agents/1010753/`. Agent ID 1010753 in the hackathon-provisioned namespace with `duoAgenticChatAvailable: true`. Full 34-file repo synced. Offline mode demonstrable end-to-end.
 
-### FIXED TODAY — `validate` CI was red on every branch
+### FIXED — `validate` CI was red on every branch
 
 The workflow asserted `agent-manifest.json`, which was renamed to `agent.yml`;
-the check failed on every push since. Fixed on `ci/smoke-tests` (workflow now
-validates `agent.yml`). Red CI on the repo front page is exactly the kind of
-discovered fiction the playbook warns about.
+the check failed on every push since. Fixed — workflow now validates `agent.yml`.
 
 ## Verified claims
 

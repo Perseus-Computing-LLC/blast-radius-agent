@@ -97,12 +97,6 @@ overlapping boundaries). Thresholds are configurable via `.env`.
 
 The reference implementation of these rules lives in `blast_radius/risk.py`
 and is covered by boundary tests in `tests/test_risk.py`.
-| Risk Level | Criteria |
-|---|---|
-| **Low** | 0-2 direct dependents, no transitive dependents |
-| **Medium** | 3-10 direct dependents, or 1-5 transitive |
-| **High** | 11-50 direct dependents, or 6-20 transitive |
-| **Critical** | 51+ dependents, or hits a shared library used across 3+ projects, or 21+ transitive dependents |
 
 ## Response Format
 

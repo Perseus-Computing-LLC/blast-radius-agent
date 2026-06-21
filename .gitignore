@@ -30,3 +30,7 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Demo artifacts
+demo/f_check_*.png
+demo/video_output/
